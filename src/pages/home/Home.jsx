@@ -1,147 +1,149 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { goToDetails } from "../../router/Coordinator";
-import { URL } from "../../constants/url";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
-import "./Home.css";
-import logo from "../../assets/images/globo.png.png"
+import { useNavigate } from "react-router-dom";
+import Header from "../../components/Header/Header";
+import { goToDetails } from "../../router/Coordinator";
+import { URL_COUNTRIES, URL_GEO_API, HeaderReq } from "../../constants/Constants";
 
 const Home = () => {
+  const [countries, setCountries] = useState([]);
+  const [currentCountry, setCurrentCountry] = useState(null);
+  const [hintsShown, setHintsShown] = useState(0);
+  const [countryGuess, setCountryGuess] = useState("");
+  const navigate = useNavigate();
+
+  const userId = localStorage.getItem("userId");
+  const token = localStorage.getItem("token");
+
   useEffect(() => {
     getData();
   }, []);
 
-  const [countries, setCountries] = useState([]);
-  const [countryName, setCountryName] = useState(null);
-  const navigate = useNavigate();
-
   const getData = async () => {
     try {
-      const res = await axios.get(`${URL}/all`);
+      const res = await axios(`${URL_COUNTRIES}/all`);
       setCountries(res.data);
     } catch (err) {
-      console.log(err.data.message);
+      console.log("Erro ao carregar países:", err.message);
     }
   };
 
-  const onClickDetails = (cName) => {
-    if (cName.toLowerCase() === countryName) {
-      localStorage.setItem("name", countryName);
+  const startGame = () => {
+    const randomIndex = Math.floor(Math.random() * countries.length);
+    setCurrentCountry(countries[randomIndex]);
+    setHintsShown(1);
+    setCountryGuess("");
+  };
+
+  const showNextHint = () => {
+    if (hintsShown < 5) {
+      setHintsShown((prev) => prev + 1);
+    }
+  };
+
+  const updateScore = async (points) => {
+    try {
+      await axios.put(
+        `${URL_GEO_API}user/${userId}`,
+        { score: points },
+        { headers: HeaderReq(token) }
+      );
+    } catch (err) {
+      console.log("Erro ao atualizar pontuação:", err.message);
+    }
+  };
+
+  const checkAnswer = async () => {
+    if (
+      countryGuess.trim().toLowerCase() ===
+      currentCountry.name.common.toLowerCase()
+    ) {
+      const score = 6 - hintsShown;
+      localStorage.setItem("name", currentCountry.name.common);
+
+      await updateScore(score);
+
+      alert(`Acertou! Sua pontuação: ${score}/5`);
       goToDetails(navigate);
     } else {
-      alert("Write the correct name of the country");
+      alert("Tente novamente!");
     }
   };
 
-  const filterByName =
-    countries &&
-    countries.filter((c) => {
-      return c.name.common.toLowerCase().includes(countryName);
-    });
+  const getHints = () => {
+    if (!currentCountry) return [];
 
-  const countryInfo =
-    Array.isArray(filterByName) && filterByName.length > 0
-      ? filterByName.map((c) => {
-          const languageList =
-            c.languages && typeof c.languages == "object"
-              ? Object.keys(c.languages)
-                  .map((key) => c.languages[key])
-                  .join(", ")
-              : [];
+    const hints = [];
 
-          const currenciesList =
-            c.currencies && typeof c.currencies == "object"
-              ? Object.keys(c.currencies)
-                  .map((key) => c.currencies[key].name)
-                  .join(", ")
-              : [];
+    if (hintsShown >= 1) hints.push(`Capital: ${currentCountry.capital?.[0]}`);
+    if (hintsShown >= 2) hints.push(`População: ${currentCountry.population}`);
+    if (hintsShown >= 3) {
+      const langs = Object.values(currentCountry.languages || {}).join(", ");
+      hints.push(`Idiomas: ${langs}`);
+    }
+    if (hintsShown >= 4) {
+      const curr = Object.values(currentCountry.currencies || {})
+        .map((c) => c.name)
+        .join(", ");
+      hints.push(`Moeda(s): ${curr}`);
+    }
+    if (hintsShown >= 5) hints.push(`Região: ${currentCountry.region}`);
 
-          return (
-            <div key={c.ccn3} onClick={() => onClickDetails(c.name.common)}>
-              <p>Name: {c.name.common}</p>
-              <p>Capital: {c?.capital}</p>
-              <p>Population: {c.population}</p>
-              <p>Languages:{languageList} </p>
-              <p> Currencies:{currenciesList}</p>
-            </div>
-          );
-        })
-      : Array.isArray(countries) && countries.length > 0
-      ? countries.map((c) => {
-          const languageList =
-            c.languages && typeof c.languages == "object"
-              ? Object.keys(c.languages)
-                  .map((key) => c.languages[key])
-                  .join(", ")
-              : [];
-
-          const currenciesList =
-            c.currencies && typeof c.currencies == "object"
-              ? Object.keys(c.currencies)
-                  .map((key) => c.currencies[key].name)
-                  .join(", ")
-              : [];
-
-          return (
-            <div key={c.ccn3} onClick={() => onClickDetails(c.name.common)}>
-              <p>Name: {c.name.common}</p>
-              <p>Capital: {c?.capital}</p>
-              <p>Population: {c.population}</p>
-              <p>Languages:{languageList} </p>
-              <p> Currencies:{currenciesList}</p>
-            </div>
-          );
-        })
-      : null;
-
-  console.log(countries);
-  console.log(filterByName);
+    return hints;
+  };
 
   return (
-    <div>
-  <div className="logo-wrapper">
-    <img src={logo} alt="Logo" />
-    <h1>Geo Facts</h1>
-  </div>
-  <h2>Find out information about a country</h2>
-  <input
-    type="text"
-    placeholder="Country Name"
-    value={countryName}
-    onChange={(e) => setCountryName(e.target.value)}
-    required
-  />
-  {countries &&
-    filterByName.map((c) => {
-      const languageList =
-        c.languages && typeof c.languages == "object"
-          ? Object.keys(c.languages)
-              .map((key) => c.languages[key])
-              .join(", ")
-          : [];
+    <div className="p-4">
+      <Header />
+      <h3 className="text-2xl font-bold mt-4 mb-2">
+        Descubra o país com base nas dicas!
+      </h3>
+      <h3 className="text-2xl font-bold mt-4 mb-2">
+        Lembrando que o nome do País está em Inglês!
+      </h3>
+      <button
+        onClick={startGame}
+        className="bg-blue-600 text-black px-4 py-2 rounded shadow"
+      >
+        Start
+      </button>
 
-      const currenciesList =
-        c.currencies && typeof c.currencies == "object"
-          ? Object.keys(c.currencies)
-              .map((key) => c.currencies[key].name)
-              .join(", ")
-          : [];
+      {currentCountry && (
+        <div className="mt-4">
+          <h3 className="text-xl mb-2">Dicas:</h3>
+          <ul className="list-disc ml-6">
+            {getHints().map((hint, index) => (
+              <li key={index}>{hint}</li>
+            ))}
+          </ul>
 
-      return (
-        <div
-          key={c.ccn3}
-          className="country-card"
-          onClick={() => onClickDetails(c.name.common)}
-        >
-          <p><strong>Name:</strong> {c.name.common}</p>
-          <p><strong>Capital:</strong> {c?.capital}</p>
-          <p><strong>Population:</strong> {c.population}</p>
-          <p><strong>Languages:</strong> {languageList}</p>
-          <p><strong>Currencies:</strong> {currenciesList}</p>
+          {hintsShown < 5 && (
+            <button
+              onClick={showNextHint}
+              className="mt-2 bg-yellow-500 text-black px-4 py-1 rounded"
+            >
+              Mostrar outra dica
+            </button>
+          )}
+
+          <div className="mt-4">
+            <input
+              type="text"
+              placeholder="Digite o nome do país"
+              value={countryGuess}
+              onChange={(e) => setCountryGuess(e.target.value)}
+              className="border px-2 py-1 rounded mr-2"
+            />
+            <button
+              onClick={checkAnswer}
+              className="bg-green-600 text-black px-4 py-1 rounded"
+            >
+              Verificar
+            </button>
+          </div>
         </div>
-      );
-    })}
-</div>
+      )}
+    </div>
   );
 };
 

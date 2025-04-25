@@ -15,3 +15,7 @@ export const goToDetails = (navigate) => {
   navigate(`/details`);
 };
 
+export const goToUserDetails = (navigate) =>{
+  navigate("/user-details")
+}
+

@@ -1,30 +1,53 @@
 import { useNavigate } from "react-router-dom";
 import { goToHome } from "../../router/Coordinator";
-import { URL } from "../../constants/url";
+import { URL_COUNTRIES } from "../../constants/Constants";
 import axios from "axios";
 import { useEffect, useState } from "react";
-import { FaArrowLeft } from "react-icons/fa";
+import { FaArrowLeft, FaExclamationTriangle } from "react-icons/fa";
 import logo from "../../assets/images/globo.png.png";
 import "./CountryDetail.css";
 
 const CountryDetail = () => {
-  const [detailCountryName, setDetailCountriName] = useState(
+  const [detailCountryName, setDetailCountryName] = useState(
     localStorage.getItem("name")
   );
   const [details, setDetails] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const navigate = useNavigate();
 
   const getDataDetails = async (name) => {
     try {
-      const res = await axios.get(`${URL}/name/${name}`);
+      setLoading(true);
+      setError(null);
+      const res = await axios.get(`${URL_COUNTRIES}/name/${name}`);
+
+      if (!res.data || res.data.length === 0) {
+        throw new Error("País não encontrado");
+      }
+
       setDetails(res.data[0]);
     } catch (err) {
-      console.log(err.data.message);
+      let errorMessage = "Erro ao carregar detalhes do país";
+
+      if (err.response) {
+        // Erro da API
+        errorMessage = err.response.data.message || errorMessage;
+      } else if (err.request) {
+        // Erro de conexão
+        errorMessage = "Erro de conexão com o servidor";
+      } else if (err.message === "País não encontrado") {
+        errorMessage = err.message;
+      }
+
+      setError(errorMessage);
+      console.error("Erro:", errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleReturn = () => {
-    localStorage.clear();
     goToHome(navigate);
   };
 
@@ -40,20 +63,52 @@ const CountryDetail = () => {
       .map((key) => details.currencies[key].name)
       .join(", ");
 
-  const giniIndex =
-    details &&
-    Object.keys(details.gini)
-      .map((key) => details.gini[key])
-      .join(", ");
-
   const flag = details?.flags?.png;
 
-  console.log(flag);
-
-  console.log(details);
   useEffect(() => {
-    getDataDetails(detailCountryName);
-  }, []);
+    if (detailCountryName) {
+      getDataDetails(detailCountryName);
+    } else {
+      setError("Nome do país não encontrado");
+      setLoading(false);
+    }
+  }, [detailCountryName]);
+
+  if (loading) {
+    return (
+      <div className="loading-container">
+        <div className="logo-wrapper">
+          <img src={logo} alt="Logo" />
+          <h1>Geo Facts</h1>
+          <FaArrowLeft onClick={() => handleReturn()} />
+        </div>
+        <div className="spinner-container">
+          <div className="spinner"></div>
+          <p>Carregando detalhes do país...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="error-container">
+        <div className="logo-wrapper">
+          <img src={logo} alt="Logo" />
+          <h1>Geo Facts</h1>
+          <FaArrowLeft onClick={() => handleReturn()} />
+        </div>
+        <div className="error-message">
+          <FaExclamationTriangle className="error-icon" />
+          <h2>Ocorreu um erro</h2>
+          <p>{error}</p>
+          <button onClick={handleReturn} className="return-button">
+            Voltar para a página inicial
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -65,37 +120,46 @@ const CountryDetail = () => {
 
       {details && (
         <div key={details.ccn3} className="country-details">
-          <p>
-            <strong>Name:</strong> {details?.name?.common}
-          </p>
-          <p>
-            <strong>Capital:</strong> {details?.capital}
-          </p>
-          <p>
-            <strong>Population:</strong> {details?.population}
-          </p>
-          <p>
-            <strong>Languages:</strong> {languagesDetails}
-          </p>
-          <p>
-            <strong>Currencies:</strong> {currenciesDetails}
-          </p>
-          <p>
-            <strong>Region:</strong> {details?.region}
-          </p>
-          <p>
-            <strong>Continent:</strong> {details?.subregion}
-          </p>
-          <p>
-            <strong>Last Gini Index:</strong> {giniIndex}
-          </p>
-          <p>
-            <strong>Area:</strong> {details?.area} Km2
-          </p>
-          <p>
-            <strong>Onu member:</strong> {!details.unMmber ? "Yes" : "No"}
-          </p>
-          <img src={flag} alt={"Flag of the country"} />
+          <div className="country-header">
+            <h2>{details?.name?.common}</h2>
+            {flag && (
+              <img
+                src={flag}
+                alt={`Bandeira de ${details?.name?.common}`}
+                className="country-flag"
+              />
+            )}
+          </div>
+
+          <div className="details-grid">
+            <div className="detail-item">
+              <strong>Capital:</strong> {details?.capital || "N/A"}
+            </div>
+            <div className="detail-item">
+              <strong>População:</strong>{" "}
+              {details?.population?.toLocaleString() || "N/A"}
+            </div>
+            <div className="detail-item">
+              <strong>Idiomas:</strong> {languagesDetails || "N/A"}
+            </div>
+            <div className="detail-item">
+              <strong>Moedas:</strong> {currenciesDetails || "N/A"}
+            </div>
+            <div className="detail-item">
+              <strong>Região:</strong> {details?.region || "N/A"}
+            </div>
+            <div className="detail-item">
+              <strong>Continente:</strong> {details?.subregion || "N/A"}
+            </div>
+            <div className="detail-item">
+              <strong>Área:</strong> {details?.area?.toLocaleString() || "N/A"}{" "}
+              km²
+            </div>
+            <div className="detail-item">
+              <strong>Membro da ONU:</strong>{" "}
+              {details?.unMember ? "Sim" : "Não"}
+            </div>
+          </div>
         </div>
       )}
     </div>
