@@ -8,7 +8,7 @@ import logo from "../../assets/images/globo.png.png";
 import "./CountryDetail.css";
 
 const CountryDetail = () => {
-  const [detailCountryName, setDetailCountryName] = useState(
+  const [detailCountryName] = useState(
     localStorage.getItem("name")
   );
   const [details, setDetails] = useState(null);

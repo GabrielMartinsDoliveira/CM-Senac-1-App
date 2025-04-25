@@ -28,7 +28,7 @@ const Profile = () => {
 
   useEffect(() => {
     getUser();
-  }, [userId]);
+  }, );
 
   if (!user) return <p className="p-4">Carregando...</p>;
 
